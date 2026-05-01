@@ -3,119 +3,42 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Neon Survivor</title>
+    <title>Neon Survivor - Balanced Evolution</title>
     <style>
         body { margin: 0; overflow: hidden; background: #050505; font-family: 'Segoe UI', sans-serif; }
         canvas { display: block; }
         .overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; text-align: center; z-index: 100; pointer-events: auto; }
         
-        /* [封面介面樣式 - 參考 image_2.png] */
         #main-menu { background: radial-gradient(circle, #1a1a1a 0%, #000 100%); }
-        #main-menu h1 { 
-            font-size: 70px; 
-            color: #00ffcc; 
-            text-shadow: 0 0 20px #00ffcc, 0 0 40px #00ffcc; 
-            margin-bottom: 20px;
-        }
-        /* 新增加灰色那行說明文字 */
-        .controls-hint {
-            color: #888888;
-            font-size: 18px;
-            margin-bottom: 40px;
-        }
-        /* 更新 ENTER SYSTEM 按鈕樣式 */
-        .btn-start {
-            padding: 15px 50px;
-            font-size: 24px;
-            background: transparent;
-            border: 3px solid #00ffcc;
-            color: #00ffcc;
-            cursor: pointer;
-            border-radius: 50px;
-            font-weight: bold;
-            transition: all 0.3s ease;
-            box-shadow: 0 0 15px rgba(0, 255, 204, 0.3);
-        }
-        .btn-start:hover {
-            background: #00ffcc;
-            color: #000;
-            box-shadow: 0 0 30px #00ffcc;
-        }
+        #main-menu h1 { font-size: 70px; color: #00ffcc; text-shadow: 0 0 20px #00ffcc, 0 0 40px #00ffcc; margin-bottom: 20px; }
+        .controls-hint { color: #888888; font-size: 18px; margin-bottom: 40px; }
+        .btn-start { padding: 15px 50px; font-size: 24px; background: transparent; border: 3px solid #00ffcc; color: #00ffcc; cursor: pointer; border-radius: 50px; font-weight: bold; transition: all 0.3s ease; box-shadow: 0 0 15px rgba(0, 255, 204, 0.3); }
+        .btn-start:hover { background: #00ffcc; color: #000; box-shadow: 0 0 30px #00ffcc; }
 
-        /* 選角介面樣式 */
         #char-select { background: #000; display: none; }
         .char-container { display: flex; gap: 20px; margin-bottom: 30px; }
-        .char-card { 
-            border: 2px solid #333; padding: 20px; width: 180px; 
-            cursor: pointer; transition: 0.3s; border-radius: 15px; background: rgba(255,255,255,0.05);
-        }
+        .char-card { border: 2px solid #333; padding: 20px; width: 180px; cursor: pointer; transition: 0.3s; border-radius: 15px; background: rgba(255,255,255,0.05); }
         .char-card:hover, .char-card.active { border-color: #00ffcc; box-shadow: 0 0 15px #00ffcc; transform: translateY(-5px); }
         
-        /* 選卡與暫停樣式 */
         #upgrade-screen, #pause-menu { background: rgba(0, 0, 0, 0.9); display: none; }
         .card-container { display: flex; gap: 15px; }
-        .upgrade-card { 
-            background: linear-gradient(145deg, #1a1a1a, #0a0a0a);
-            border: 2px solid #ffcc00; padding: 25px; width: 220px;
-            border-radius: 15px; cursor: pointer; transition: 0.2s;
-        }
+        .upgrade-card { background: linear-gradient(145deg, #1a1a1a, #0a0a0a); border: 2px solid #ffcc00; padding: 25px; width: 220px; border-radius: 15px; cursor: pointer; transition: 0.2s; }
         .upgrade-card:hover { transform: scale(1.05); box-shadow: 0 0 20px #ffcc00; }
         
-        /* [死亡介面樣式 - 參考 image_4.png] */
         #game-over-screen { background: #000000; display: none; }
-        #game-over-screen h2 {
-            font-size: 60px;
-            color: #ff4444;
-            text-shadow: 0 0 15px #ff4444, 0 0 30px #ff4444;
-            margin-bottom: 20px;
-        }
-        #game-over-screen p {
-            font-size: 28px;
-            color: white;
-            margin-bottom: 40px;
-        }
-        /* 更新死亡畫面的按鈕樣式 */
-        .btn-go-try {
-            padding: 12px 60px;
-            font-size: 20px;
-            background: transparent;
-            border: 3px solid #00ffcc;
-            color: #00ffcc;
-            cursor: pointer;
-            border-radius: 30px;
-            font-weight: bold;
-            transition: all 0.3s ease;
-            margin: 10px;
-        }
-        .btn-go-try:hover {
-            background: #00ffcc;
-            color: #000;
-        }
-        .btn-go-exit {
-            padding: 12px 60px;
-            font-size: 20px;
-            background: transparent;
-            border: 3px solid #ff4444;
-            color: #ff4444;
-            cursor: pointer;
-            border-radius: 30px;
-            font-weight: bold;
-            transition: all 0.3s ease;
-            margin: 10px;
-        }
-        .btn-go-exit:hover {
-            background: #ff4444;
-            color: #000;
-        }
+        #game-over-screen h2 { font-size: 60px; color: #ff4444; text-shadow: 0 0 15px #ff4444, 0 0 30px #ff4444; margin-bottom: 20px; }
+        #game-over-screen p { font-size: 28px; color: white; margin-bottom: 40px; }
+        .btn-go-try { padding: 12px 60px; font-size: 20px; background: transparent; border: 3px solid #00ffcc; color: #00ffcc; cursor: pointer; border-radius: 30px; font-weight: bold; transition: all 0.3s ease; margin: 10px; }
+        .btn-go-try:hover { background: #00ffcc; color: #000; }
+        .btn-go-exit { padding: 12px 60px; font-size: 20px; background: transparent; border: 3px solid #ff4444; color: #ff4444; cursor: pointer; border-radius: 30px; font-weight: bold; transition: all 0.3s ease; margin: 10px; }
+        .btn-go-exit:hover { background: #ff4444; color: #000; }
         
-        /* [UI 顯示區 - 將 Energy 改成 Overload - 參考 image_3.png] */
         #game-ui { position: absolute; top: 20px; left: 20px; color: white; font-size: 20px; pointer-events: none; display: none; text-align: left; }
         .bar-container { width: 220px; height: 16px; background: #222; border: 2px solid #444; margin: 5px 0 15px 0; position: relative; overflow: hidden; }
         #hp-ghost { position: absolute; top: 0; left: 0; height: 100%; background: #fff; width: 100%; transition: width 0.6s ease-out; z-index: 1; }
         #hp-bar { position: absolute; top: 0; left: 0; height: 100%; background: #ff4444; width: 100%; z-index: 2; transition: width 0.1s ease-out; }
-        #overload-bar { width: 0%; height: 100%; background: #00ffcc; box-shadow: 0 0 10px #00ffcc; } /* 更改名稱 */
+        #overload-bar { width: 0%; height: 100%; background: #00ffcc; box-shadow: 0 0 10px #00ffcc; }
 
-        /* 受傷震動動畫 */
         @keyframes shake {
             0% { transform: translate(1px, 1px); }
             20% { transform: translate(-1px, -2px); }
@@ -174,8 +97,10 @@
             <div id="hp-ghost"></div>
             <div id="hp-bar"></div>
         </div>
-        OVERLOAD <div class="bar-container">
-            <div id="overload-bar"></div> </div>
+        OVERLOAD
+        <div class="bar-container">
+            <div id="overload-bar"></div>
+        </div>
     </div>
 
     <div id="boss-ui">
@@ -186,20 +111,21 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
-// --- [保留基底變數] ---
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 let score=0, isGameOver=false, isPaused=false, gameStarted=false, energy=0, isOverloaded=false, overloadTimer=0, chargeTime=0, isCharging=false, boss=null, lastBossThresh=0, lastUpgradeThresh=0;
 let bullets=[], enemies=[], collectibles=[]; 
 const keys={};
 
-// --- [強化模組專用變數] ---
 let damageFlash = 0; 
 
+// --- [角色數值調整區] ---
 const heroes = {
-    knight: { speed: 5, maxHp: 100, chargeSpeed: 1.0, color: '#00ffcc', defense: 1 },
-    scout: { speed: 7.5, maxHp: 70, chargeSpeed: 1.8, color: '#ffff00', defense: 1.2 },
-    fortress: { speed: 3.5, maxHp: 200, chargeSpeed: 0.6, color: '#0088ff', defense: 0.6 }
+    knight: { speed: 5, maxHp: 100, chargeSpeed: 1.0, color: '#00ffcc', defense: 1, damageMult: 1 },
+    // 調整：Scout 血量改為 Knight(100) 的一半 = 50
+    scout: { speed: 7.5, maxHp: 50, chargeSpeed: 1.8, color: '#ffff00', defense: 1.2, damageMult: 1 },
+    // 調整：Fortress 攻擊傷害倍率設為 2
+    fortress: { speed: 3.5, maxHp: 200, chargeSpeed: 0.6, color: '#0088ff', defense: 0.6, damageMult: 2 }
 };
 let player = { x:0, y:0, size:20, angle:0, hp: 100, maxHp: 100, type: 'knight', multiShot: 1 };
 
@@ -210,11 +136,10 @@ const upgradePool = [
     { title: "Repair", desc: "Heal 50% HP", effect: () => player.hp = Math.min(player.hp + player.maxHp*0.5, player.maxHp) }
 ];
 
-// --- [UI 與流程控制函式] ---
 function toCharSelect() { document.getElementById('main-menu').style.display = 'none'; document.getElementById('char-select').style.display = 'flex'; }
 function selectChar(type) { player.type = type; document.querySelectorAll('.char-card').forEach(c => c.classList.remove('active')); document.getElementById('card-' + type).classList.add('active'); document.getElementById('confirm-btn').disabled = false; }
 function startGame() { document.getElementById('char-select').style.display = 'none'; document.getElementById('game-ui').style.display = 'block'; gameStarted = true; resize(); resetGame(); }
-function backToMain() { location.reload(); } // 新增回到主選單函式
+function backToMain() { location.reload(); }
 
 function resetGame() { 
     const d = heroes[player.type]; 
@@ -227,18 +152,14 @@ function resetGame() {
     updateUI(); 
 }
 
-// 強化版 updateUI (包含殘影)
 function updateUI() { 
     document.getElementById('score').innerText = score; 
     const hpPercent = Math.max(0, (player.hp / player.maxHp * 100)) + "%";
     document.getElementById('hp-bar').style.width = hpPercent;
-    // 強化：血條殘影追蹤
     setTimeout(() => { if(document.getElementById('hp-ghost')) document.getElementById('hp-ghost').style.width = hpPercent; }, 250);
-    // 更新 Overload 條 (原本是 energy)
     document.getElementById('overload-bar').style.width = energy + "%"; 
 }
 
-// 強化模組：受傷震動與閃爍觸發
 function triggerDamageFeedback(amt) {
     player.hp -= amt;
     damageFlash = 10;
@@ -273,7 +194,6 @@ function spawnBoss() {
     document.getElementById('boss-ui').style.display = 'block'; 
 }
 
-// 強化模組：繪製網格背景
 function drawGrid() {
     ctx.strokeStyle = "rgba(0, 255, 204, 0.1)"; ctx.lineWidth = 1;
     const gridSize = 60;
@@ -283,7 +203,6 @@ function drawGrid() {
     ctx.stroke();
 }
 
-// --- [控制邏輯] ---
 window.addEventListener('keydown', e => { 
     keys[e.key.toLowerCase()] = true; 
     if(e.key === 'Escape' || e.key.toLowerCase() === 'p') togglePause(); 
@@ -294,8 +213,26 @@ window.addEventListener('mousedown', e => { if(!gameStarted || isPaused) return;
 window.addEventListener('mouseup', e => { if(e.button===2 && isCharging) { if(chargeTime > 30 / heroes[player.type].chargeSpeed) releaseNeonRing(); isCharging=false; chargeTime=0; } });
 window.addEventListener('contextmenu', e => e.preventDefault());
 
-function fireBullet() { for(let i=0; i<player.multiShot; i++) { let offset = (i - (player.multiShot-1)/2) * 0.1; bullets.push({ x: player.x, y: player.y, vx: Math.cos(player.angle + offset)*14, vy: Math.sin(player.angle + offset)*14 }); } }
-function releaseNeonRing() { for(let a=0; a<Math.PI*2; a+=0.4) bullets.push({x:player.x, y:player.y, vx:Math.cos(a)*8, vy:Math.sin(a)*8, type:'ring'}); }
+// --- [發射邏輯更新：帶入傷害倍率] ---
+function fireBullet() { 
+    const dmg = heroes[player.type].damageMult || 1;
+    for(let i=0; i<player.multiShot; i++) { 
+        let offset = (i - (player.multiShot-1)/2) * 0.1; 
+        bullets.push({ 
+            x: player.x, 
+            y: player.y, 
+            vx: Math.cos(player.angle + offset)*14, 
+            vy: Math.sin(player.angle + offset)*14,
+            damage: dmg // 子彈帶有傷害屬性
+        }); 
+    } 
+}
+function releaseNeonRing() { 
+    const dmg = heroes[player.type].damageMult || 1;
+    for(let a=0; a<Math.PI*2; a+=0.4) {
+        bullets.push({x:player.x, y:player.y, vx:Math.cos(a)*8, vy:Math.sin(a)*8, type:'ring', damage: dmg}); 
+    }
+}
 
 function spawnEnemy() { 
     if(!gameStarted || isPaused || isGameOver || enemies.length > 60) return; 
@@ -305,19 +242,17 @@ function spawnEnemy() {
 }
 setInterval(spawnEnemy, 1000);
 
-// --- [核心遊戲邏輯：維持原本手感並注入強化] ---
 function update() {
     if(!gameStarted || isPaused || isGameOver) return; 
     const hero = heroes[player.type];
     if(damageFlash > 0) damageFlash--; 
 
-    // 移動
     if(keys['w']) player.y -= hero.speed; if(keys['s']) player.y += hero.speed; if(keys['a']) player.x -= hero.speed; if(keys['d']) player.x += hero.speed;
     player.x = Math.max(20, Math.min(canvas.width - 20, player.x));
     player.y = Math.max(20, Math.min(canvas.height - 20, player.y));
 
     if(isCharging) chargeTime += hero.chargeSpeed;
-    if(isOverloaded) { if(Date.now() % 5 === 0) fireBullet(); overloadTimer--; if(overloadTimer <= 0) isOverloaded = false; updateUI(); } // 更新 UI 當 overloadTimer 變化時
+    if(isOverloaded) { if(Date.now() % 5 === 0) fireBullet(); overloadTimer--; if(overloadTimer <= 0) isOverloaded = false; updateUI(); } 
     
     if(boss) {
         let d = Math.hypot(player.x - boss.x, player.y - boss.y);
@@ -326,7 +261,9 @@ function update() {
         if(d < boss.size/2 + 15) { triggerDamageFeedback(1.0 * hero.defense); }
         for(let j=bullets.length-1; j>=0; j--) {
             if(Math.hypot(bullets[j].x - boss.x, bullets[j].y - boss.y) < boss.size/2) {
-                boss.hp--; if(bullets[j].type!=='ring') bullets.splice(j, 1);
+                // 修正：依照子彈傷害扣血
+                boss.hp -= (bullets[j].damage || 1); 
+                if(bullets[j].type!=='ring') bullets.splice(j, 1);
                 if(boss.hp <= 0) { 
                     score += 5000; boss = null; document.getElementById('boss-ui').style.display = 'none'; 
                     for(let k=0; k<10; k++) collectibles.push({x: player.x+Math.random()*100-50, y: player.y+Math.random()*100-50});
@@ -351,7 +288,6 @@ function update() {
         }
     }
 
-    // 拾取物邏輯 - 當拾取時更新 UI
     for(let i=collectibles.length-1; i>=0; i--) { 
         if(Math.hypot(player.x - collectibles[i].x, player.y - collectibles[i].y) < 30) { 
             energy = Math.min(energy + 8, 100); 
@@ -364,23 +300,26 @@ function update() {
     if(player.hp <= 0) { isGameOver = true; document.getElementById('final-score-val').innerText = score; document.getElementById('game-over-screen').style.display = 'flex'; }
 }
 
-// --- [視覺繪製：注入強化效果] ---
 function draw() {
     ctx.fillStyle = '#050505'; ctx.fillRect(0,0,canvas.width,canvas.height);
     if(gameStarted) {
-        drawGrid(); // 強化：網格
+        drawGrid();
         const hero = heroes[player.type];
         ctx.fillStyle = '#00ffcc'; collectibles.forEach(c => ctx.fillRect(c.x-4, c.y-4, 8, 8));
-        bullets.forEach(b => { ctx.fillStyle = b.type==='ring'?'#00ffcc':'#ffff00'; ctx.beginPath(); ctx.arc(b.x, b.y, b.type==='ring'?6:4, 0, Math.PI*2); ctx.fill(); });
+        bullets.forEach(b => { 
+            ctx.fillStyle = b.type==='ring'?'#00ffcc':'#ffff00'; 
+            ctx.beginPath(); 
+            // 視覺增強：坦克子彈變大一點點
+            ctx.arc(b.x, b.y, (b.type==='ring'?6:4) * (b.damage > 1 ? 1.5 : 1), 0, Math.PI*2); 
+            ctx.fill(); 
+        });
         ctx.fillStyle = '#ff4444'; enemies.forEach(e => ctx.fillRect(e.x-10, e.y-10, 20, 20));
         if(boss) { ctx.fillStyle = "#ff0055"; ctx.shadowBlur = 20; ctx.shadowColor = "#ff0055"; ctx.fillRect(boss.x-boss.size/2, boss.y-boss.size/2, boss.size, boss.size); ctx.shadowBlur = 0; }
         
-        // 角色繪製
         ctx.save(); ctx.translate(player.x, player.y); ctx.rotate(player.angle);
         ctx.fillStyle = (damageFlash > 0 && damageFlash % 2 === 0) ? '#ff0000' : (isOverloaded ? '#fff' : hero.color);
         ctx.beginPath(); ctx.moveTo(22,0); ctx.lineTo(-15,-15); ctx.lineTo(-10,0); ctx.lineTo(-15,15); ctx.fill(); ctx.restore();
         
-        // 強化：經典蓄力圈
         if(isCharging) {
             ctx.beginPath();
             let radius = Math.min(chargeTime * 2.5, 60);
@@ -396,7 +335,6 @@ function draw() {
     requestAnimationFrame(draw);
 }
 
-// 系統
 setInterval(update, 1000/60); 
 function resize() { canvas.width=window.innerWidth; canvas.height=window.innerHeight; }
 window.addEventListener('resize', resize); resize(); draw();
