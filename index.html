@@ -8,7 +8,6 @@
         body { margin: 0; overflow: hidden; background: #050505; font-family: 'Segoe UI', sans-serif; }
         canvas { display: block; }
         
-        /* UI 遮罩層樣式 */
         .overlay {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center;
@@ -17,9 +16,9 @@
 
         #start-screen { background: radial-gradient(circle, #1a1a1a 0%, #000 100%); }
         #start-screen h1 { font-size: 60px; color: #00ffcc; text-shadow: 0 0 20px #00ffcc; margin-bottom: 5px; }
-        #pause-menu { background: rgba(0, 0, 0, 0.8); display: none; }
+        #pause-menu, #game-over-screen { background: rgba(0, 0, 0, 0.85); display: none; }
+        #game-over-screen h2 { font-size: 50px; color: #ff4444; text-shadow: 0 0 15px #ff4444; }
 
-        /* 按鈕設計 */
         .btn {
             padding: 12px 40px; font-size: 20px; width: 220px;
             background: transparent; border: 2px solid #00ffcc; color: #00ffcc;
@@ -27,7 +26,6 @@
         }
         .btn:hover { background: #00ffcc; color: #000; box-shadow: 0 0 20px #00ffcc; }
 
-        /* 遊戲中 UI 介面 */
         #game-ui {
             position: absolute; top: 20px; left: 20px; color: white; 
             font-size: 22px; pointer-events: none; display: none;
@@ -36,28 +34,45 @@
         #hp-bar { width: 100%; height: 100%; background: #ff4444; transition: 0.1s; }
         #energy-bar { width: 0%; height: 100%; background: #00ffcc; box-shadow: 0 0 10px #00ffcc; }
         
-        .hint { font-size: 14px; color: #888; margin-top: 10px; }
+        #boss-ui {
+            position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
+            text-align: center; display: none; width: 60%;
+        }
+        #boss-bar-container { width: 100%; height: 15px; background: rgba(0,0,0,0.5); border: 2px solid #ff0055; margin-top: 5px; }
+        #boss-bar { width: 100%; height: 100%; background: linear-gradient(to right, #ff0055, #ff4444); transition: width 0.3s; }
     </style>
 </head>
 <body>
 
     <div id="start-screen" class="overlay">
         <h1>NEON SURVIVOR</h1>
-        <p class="hint">WASD: Move | Left Click: Shoot | Right Click (Hold): Neon Ring | Esc/P: Pause</p>
+        <p style="color:#888">WASD: Move | Left Click: Shoot | Right Click: Neon Ring (Hold)</p>
         <button class="btn" onclick="startGame()">ENTER SYSTEM</button>
     </div>
 
     <div id="pause-menu" class="overlay">
-        <h2>SYSTEM PAUSED</h2>
+        <h2 style="color: #ffcc00;">SYSTEM PAUSED</h2>
         <button class="btn" onclick="togglePause()">RESUME</button>
-        <button class="btn" onclick="resetGame()">RESTART</button>
-        <button class="btn" style="border-color:#ff4444; color:#ff4444" onclick="backToMain()">MENU</button>
+        <button class="btn" onclick="resetGame()">REBOOT</button>
+        <button class="btn" style="border-color:#ff4444; color:#ff4444" onclick="backToMain()">SHUTDOWN</button>
+    </div>
+
+    <div id="game-over-screen" class="overlay">
+        <h2>MISSION FAILED</h2>
+        <div style="font-size:30px; margin-bottom:30px;">Final Score: <span id="final-score-val">0</span></div>
+        <button class="btn" onclick="resetGame()">TRY AGAIN</button>
+        <button class="btn" style="border-color:#ff4444; color:#ff4444" onclick="backToMain()">EXIT TO MENU</button>
     </div>
 
     <div id="game-ui">
         Score: <span id="score">0</span>
         <div>HP</div><div class="bar-container"><div id="hp-bar"></div></div>
-        <div id="energy-label">OVERLOAD ENERGY</div><div class="bar-container"><div id="energy-bar"></div></div>
+        <div>OVERLOAD</div><div class="bar-container"><div id="energy-bar"></div></div>
+    </div>
+
+    <div id="boss-ui">
+        <div style="color: #ff0055; font-weight: bold; font-size: 24px; text-shadow: 0 0 10px #ff0055;">NEON TITAN</div>
+        <div id="boss-bar-container"><div id="boss-bar"></div></div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -68,315 +83,217 @@ const ctx = canvas.getContext('2d');
 const scoreElement = document.getElementById('score');
 const hpBar = document.getElementById('hp-bar');
 const energyBar = document.getElementById('energy-bar');
-const pauseMenu = document.getElementById('pause-menu');
-const startScreen = document.getElementById('start-screen');
-const gameUI = document.getElementById('game-ui');
+const bossUI = document.getElementById('boss-ui');
+const bossBar = document.getElementById('boss-bar');
 
-// --- 遊戲狀態變數 ---
-let score = 0;
-let isGameOver = false;
-let isPaused = false;
-let gameStarted = false;
-let energy = 0;
-let isOverloaded = false;
-let overloadTimer = 0;
-let chargeTime = 0;
-let isCharging = false;
+let score = 0, isGameOver = false, isPaused = false, gameStarted = false;
+let energy = 0, isOverloaded = false, overloadTimer = 0;
+let chargeTime = 0, isCharging = false;
+let boss = null; 
+let lastBossThreshold = 0; // 防止 BOSS 重複觸發的標記
 
-const player = {
-    x: 0,
-    y: 0,
-    size: 20,
-    angle: 0,
-    speed: 5,
-    hp: 100,
-    maxHp: 100,
-    color: '#00ffcc'
-};
-
-let bullets = [];
-let enemies = [];
-let particles = [];
-let collectibles = [];
+const player = { x: 0, y: 0, size: 20, angle: 0, speed: 5, hp: 100, maxHp: 100 };
+let bullets = [], enemies = [], particles = [], collectibles = [];
 const keys = {};
 
-// --- 核心系統函式 ---
-
 function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    if(!gameStarted) {
-        player.x = canvas.width / 2;
-        player.y = canvas.height / 2;
-    }
+    canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+    if(!gameStarted) { player.x = canvas.width / 2; player.y = canvas.height / 2; }
 }
 window.addEventListener('resize', resize);
 resize();
 
-function startGame() {
-    gameStarted = true;
-    startScreen.style.display = 'none';
-    gameUI.style.display = 'block';
-    resetGame();
+function startGame() { 
+    gameStarted = true; 
+    document.getElementById('start-screen').style.display = 'none'; 
+    document.getElementById('game-ui').style.display = 'block'; 
+    resetGame(); 
 }
 
-function togglePause() {
-    if (!gameStarted || isGameOver) return;
-    isPaused = !isPaused;
-    pauseMenu.style.display = isPaused ? 'flex' : 'none';
+function togglePause() { 
+    if (!gameStarted || isGameOver) return; 
+    isPaused = !isPaused; 
+    document.getElementById('pause-menu').style.display = isPaused ? 'flex' : 'none'; 
 }
+
+function backToMain() { location.reload(); }
 
 function resetGame() {
-    score = 0;
-    scoreElement.innerText = "0";
-    energy = 0;
-    isOverloaded = false;
-    isGameOver = false;
-    isPaused = false;
-    player.hp = 100;
-    bullets = [];
-    enemies = [];
-    particles = [];
-    collectibles = [];
-    hpBar.style.width = "100%";
-    energyBar.style.width = "0%";
-    pauseMenu.style.display = 'none';
+    score = 0; scoreElement.innerText = "0"; energy = 0; isOverloaded = false; isGameOver = false; isPaused = false;
+    lastBossThreshold = 0;
+    player.hp = 100; player.x = canvas.width/2; player.y = canvas.height/2;
+    bullets = []; enemies = []; particles = []; collectibles = []; boss = null;
+    hpBar.style.width = "100%"; energyBar.style.width = "0%"; bossUI.style.display = 'none';
+    document.getElementById('game-over-screen').style.display = 'none';
 }
 
-function backToMain() {
-    gameStarted = false;
-    isPaused = false;
-    pauseMenu.style.display = 'none';
-    gameUI.style.display = 'none';
-    startScreen.style.display = 'flex';
+function spawnBoss() {
+    boss = { x: canvas.width/2, y: -100, size: 100, hp: 100, maxHp: 100, speed: 0.8, color: '#ff0055' };
+    bossUI.style.display = 'block';
+    bossBar.style.width = "100%";
 }
 
-// --- 輸入控制與右鍵攔截 ---
-
-window.addEventListener('contextmenu', e => e.preventDefault()); // 關鍵：禁用右鍵選單
-
-window.addEventListener('keydown', e => {
-    keys[e.key.toLowerCase()] = true;
-    if(e.key === 'p' || e.key === 'Escape') togglePause();
-});
-
+window.addEventListener('contextmenu', e => e.preventDefault());
+window.addEventListener('keydown', e => { keys[e.key.toLowerCase()] = true; if(e.key === 'p' || e.key === 'Escape') togglePause(); });
 window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
-
-window.addEventListener('mousemove', e => {
-    if(gameStarted && !isPaused) {
-        player.angle = Math.atan2(e.clientY - player.y, e.clientX - player.x);
-    }
-});
+window.addEventListener('mousemove', e => { if(gameStarted && !isPaused && !isGameOver) player.angle = Math.atan2(e.clientY - player.y, e.clientX - player.x); });
 
 window.addEventListener('mousedown', e => { 
-    if(!gameStarted || isPaused) return;
-    if(e.button === 0) fireBullet(); // 左鍵射擊
-    if(e.button === 2) isCharging = true; // 右鍵蓄力
+    if(!gameStarted || isPaused || isGameOver) return;
+    if(e.button === 0) fireBullet();
+    if(e.button === 2) isCharging = true;
 });
 
 window.addEventListener('mouseup', e => {
     if(e.button === 2 && isCharging) {
         if(chargeTime > 40) releaseNeonRing();
-        isCharging = false;
-        chargeTime = 0;
+        isCharging = false; chargeTime = 0;
     }
 });
 
-// --- 武器系統 ---
-
 function fireBullet() {
-    bullets.push({
-        x: player.x,
-        y: player.y,
-        vx: Math.cos(player.angle) * 14,
-        vy: Math.sin(player.angle) * 14,
-        type: 'normal'
-    });
+    bullets.push({ x: player.x, y: player.y, vx: Math.cos(player.angle)*14, vy: Math.sin(player.angle)*14, type: 'normal' });
 }
 
 function releaseNeonRing() {
-    // 釋放一圈 360 度的穿透彈
-    for(let a = 0; a < Math.PI * 2; a += 0.4) {
-        bullets.push({
-            x: player.x,
-            y: player.y,
-            vx: Math.cos(a) * 8,
-            vy: Math.sin(a) * 8,
-            type: 'ring'
-        });
-    }
-}
-
-// --- 特效與敵人生成 ---
-
-function createParticles(x, y, color, count = 8) {
-    for(let i = 0; i < count; i++) {
-        particles.push({
-            x: x,
-            y: y,
-            vx: (Math.random() - 0.5) * 8,
-            vy: (Math.random() - 0.5) * 8,
-            life: 1.0,
-            color: color
-        });
+    for(let a=0; a<Math.PI*2; a+=0.4) {
+        bullets.push({ x: player.x, y: player.y, vx: Math.cos(a)*8, vy: Math.sin(a)*8, type: 'ring' });
     }
 }
 
 function spawnEnemy() {
-    if(!gameStarted || isGameOver || isPaused) return;
+    if(!gameStarted || isGameOver || isPaused || boss) return; 
     const side = Math.floor(Math.random() * 4);
-    let x, y;
-    if (side === 0) { x = Math.random() * canvas.width; y = -30; }
-    else if (side === 1) { x = Math.random() * canvas.width; y = canvas.height + 30; }
-    else if (side === 2) { x = -30; y = Math.random() * canvas.height; }
-    else { x = canvas.width + 30; y = Math.random() * canvas.height; }
-    
-    enemies.push({
-        x, y,
-        size: 25,
-        speed: (isOverloaded ? 1.2 : 2 + Math.random())
-    });
+    let x = (side%2===0)? Math.random()*canvas.width : (side===1? -30 : canvas.width+30);
+    let y = (side%2!==0)? Math.random()*canvas.height : (side===0? -30 : canvas.height+30);
+    enemies.push({ x, y, size: 25, speed: 2 + Math.random() });
 }
 setInterval(spawnEnemy, 1000);
-
-// --- 遊戲邏輯更新 ---
 
 function update() {
     if (!gameStarted || isGameOver || isPaused) return;
 
     // 1. 玩家移動
-    let curSpeed = isOverloaded ? player.speed * 1.4 : player.speed;
-    if (keys['w']) player.y -= curSpeed;
-    if (keys['s']) player.y += curSpeed;
-    if (keys['a']) player.x -= curSpeed;
-    if (keys['d']) player.x += curSpeed;
-
-    // 2. 蓄力與超載狀態處理
+    let curSpeed = isOverloaded ? player.speed * 1.5 : player.speed;
+    if (keys['w']) player.y -= curSpeed; if (keys['s']) player.y += curSpeed;
+    if (keys['a']) player.x -= curSpeed; if (keys['d']) player.x += curSpeed;
+    
+    // 2. 蓄力與超載
     if (isCharging) chargeTime++;
     if (isOverloaded) {
-        if(Date.now() % 6 === 0) fireBullet(); // 超載時自動連發
-        overloadTimer--;
-        energyBar.style.width = (overloadTimer / 300 * 100) + "%";
+        if(Date.now() % 5 === 0) fireBullet(); 
+        overloadTimer--; energyBar.style.width = (overloadTimer/300*100) + "%";
         if(overloadTimer <= 0) isOverloaded = false;
     }
 
-    // 3. 粒子更新
-    particles.forEach((p, i) => {
-        p.x += p.vx; p.y += p.vy;
-        p.life -= 0.03;
+    // 3. 特效更新
+    for(let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.03;
         if(p.life <= 0) particles.splice(i, 1);
-    });
+    }
 
-    // 4. 能量收集品更新
-    collectibles.forEach((c, i) => {
-        if(Math.hypot(player.x - c.x, player.y - c.y) < 30) {
-            energy = Math.min(energy + 10, 100);
+    // 4. 收集品
+    for(let i = collectibles.length - 1; i >= 0; i--) {
+        let c = collectibles[i];
+        if(Math.hypot(player.x-c.x, player.y-c.y) < 30) {
+            energy = Math.min(energy + 8, 100); 
             energyBar.style.width = energy + "%";
-            if(energy >= 100 && !isOverloaded) {
-                isOverloaded = true;
-                energy = 0;
-                overloadTimer = 300; // 超載持續 300 幀
-            }
+            if(energy >= 100 && !isOverloaded) { isOverloaded = true; energy = 0; overloadTimer = 300; }
             collectibles.splice(i, 1);
         }
-    });
+    }
 
     // 5. 子彈移動
-    bullets.forEach((b, bi) => {
-        b.x += b.vx; b.y += b.vy;
-        if(b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) bullets.splice(bi, 1);
-    });
+    for(let i = bullets.length - 1; i >= 0; i--) {
+        let b = bullets[i]; b.x += b.vx; b.y += b.vy;
+        if(b.x<0 || b.x>canvas.width || b.y<0 || b.y>canvas.height) bullets.splice(i, 1);
+    }
 
-    // 6. 敵人 AI 與碰撞
-    enemies.forEach((e, ei) => {
-        let dist = Math.hypot(player.x - e.x, player.y - e.y);
-        e.x += (player.x - e.x) / dist * e.speed;
-        e.y += (player.y - e.y) / dist * e.speed;
-
-        // 碰撞玩家
-        if(dist < player.size + 12) {
-            player.hp -= 0.5;
-            hpBar.style.width = player.hp + "%";
-            if(player.hp <= 0) {
-                isGameOver = true;
-                alert("SYSTEM FAILURE! Final Score: " + score);
-                backToMain();
+    // 6. BOSS 邏輯
+    if (boss) {
+        let dist = Math.hypot(player.x - boss.x, player.y - boss.y);
+        boss.x += (player.x - boss.x)/dist * boss.speed; boss.y += (player.y - boss.y)/dist * boss.speed;
+        if(dist < boss.size/2 + player.size) { player.hp -= 1; hpBar.style.width = player.hp + "%"; }
+        
+        for(let i = bullets.length - 1; i >= 0; i--) {
+            let b = bullets[i];
+            if(Math.hypot(b.x-boss.x, b.y-boss.y) < boss.size/2) {
+                boss.hp -= 1; bossBar.style.width = (boss.hp/boss.maxHp*100) + "%";
+                for(let k=0; k<2; k++) particles.push({ x: b.x, y: b.y, vx: (Math.random()-0.5)*5, vy: (Math.random()-0.5)*5, life: 0.8, color: '#ff0055' });
+                if(b.type !== 'ring') bullets.splice(i, 1);
+                if(boss.hp <= 0) {
+                    for(let k=0; k<12; k++) collectibles.push({x: boss.x+(Math.random()-0.5)*80, y: boss.y+(Math.random()-0.5)*80});
+                    score += 2000; scoreElement.innerText = score;
+                    boss = null; bossUI.style.display = 'none';
+                }
             }
         }
+    }
 
-        // 碰撞子彈
-        bullets.forEach((b, bi) => {
-            if(Math.hypot(b.x - e.x, b.y - e.y) < 20) {
-                createParticles(e.x, e.y, '#ff4444');
-                if(Math.random() > 0.75) collectibles.push({x: e.x, y: e.y}); // 隨機掉落能量
-                enemies.splice(ei, 1);
-                if(b.type !== 'ring') bullets.splice(bi, 1); // 只有普通子彈會消失，光環彈具穿透性
-                score += 100;
-                scoreElement.innerText = score;
+    // 7. 敵人邏輯
+    for(let i = enemies.length - 1; i >= 0; i--) {
+        let e = enemies[i];
+        let dist = Math.hypot(player.x - e.x, player.y - e.y);
+        e.x += (player.x - e.x)/dist * e.speed; e.y += (player.y - e.y)/dist * e.speed;
+        
+        if(dist < player.size + 12) { player.hp -= 0.6; hpBar.style.width = player.hp + "%"; }
+        
+        for(let bi = bullets.length - 1; bi >= 0; bi--) {
+            let b = bullets[bi];
+            if(Math.hypot(b.x-e.x, b.y-e.y) < 22) {
+                for(let k=0; k<6; k++) particles.push({ x: e.x, y: e.y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 1, color: '#ff4444' });
+                if(Math.random()>0.8) collectibles.push({x: e.x, y: e.y});
+                enemies.splice(i, 1); 
+                if(b.type !== 'ring') bullets.splice(bi, 1);
+                score += 100; scoreElement.innerText = score;
+                break; // 敵人已死，跳出子彈檢查
             }
-        });
-    });
+        }
+    }
+
+    // 8. BOSS 觸發器 (修正後的邏輯)
+    let currentThreshold = Math.floor(score / 5000) * 5000;
+    if (currentThreshold > lastBossThreshold && !boss) {
+        lastBossThreshold = currentThreshold;
+        spawnBoss();
+    }
+
+    // 9. 死亡判定
+    if(player.hp <= 0) { 
+        isGameOver = true; 
+        document.getElementById('final-score-val').innerText = score; 
+        document.getElementById('game-over-screen').style.display = 'flex'; 
+    }
 }
 
-// --- 繪圖系統 ---
-
 function draw() {
-    // 根據狀態切換背景色
     ctx.fillStyle = isOverloaded ? 'rgba(20, 0, 40, 0.4)' : 'rgba(10, 10, 10, 0.4)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     if (gameStarted) {
-        // 畫能量收集品
-        collectibles.forEach(c => {
-            ctx.fillStyle = '#00ffcc';
-            ctx.shadowBlur = 10; ctx.shadowColor = '#00ffcc';
-            ctx.fillRect(c.x - 4, c.y - 4, 8, 8);
-            ctx.shadowBlur = 0;
-        });
-
-        // 畫粒子
-        particles.forEach(p => {
-            ctx.globalAlpha = p.life;
-            ctx.fillStyle = p.color;
-            ctx.fillRect(p.x, p.y, 3, 3);
-        });
+        collectibles.forEach(c => { ctx.fillStyle = '#00ffcc'; ctx.fillRect(c.x-4, c.y-4, 8, 8); });
+        particles.forEach(p => { ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, 3, 3); });
         ctx.globalAlpha = 1;
-
-        // 畫子彈
-        bullets.forEach(b => {
-            ctx.fillStyle = b.type === 'ring' ? '#00ffcc' : '#ffff00';
-            ctx.beginPath();
-            ctx.arc(b.x, b.y, b.type === 'ring' ? 6 : 4, 0, Math.PI * 2);
-            ctx.fill();
+        bullets.forEach(b => { 
+            ctx.fillStyle = b.type==='ring'?'#00ffcc':'#ffff00'; 
+            ctx.beginPath(); ctx.arc(b.x, b.y, b.type==='ring'?6:4, 0, Math.PI*2); ctx.fill(); 
         });
-
-        // 畫敵人
-        ctx.fillStyle = '#ff4444';
-        enemies.forEach(e => ctx.fillRect(e.x - 12, e.y - 12, 24, 24));
-
-        // 畫蓄力環視覺效果
-        if(isCharging) {
-            ctx.beginPath();
-            ctx.arc(player.x, player.y, chargeTime * 1.5, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(0, 255, 204, ${Math.min(chargeTime / 40, 0.5)})`;
-            ctx.lineWidth = 2;
-            ctx.stroke();
+        ctx.fillStyle = '#ff4444'; enemies.forEach(e => ctx.fillRect(e.x-12, e.y-12, 24, 24));
+        if (boss) {
+            ctx.fillStyle = boss.color; ctx.shadowBlur = 20; ctx.shadowColor = '#ff0055';
+            ctx.fillRect(boss.x - boss.size/2, boss.y - boss.size/2, boss.size, boss.size);
+            ctx.shadowBlur = 0;
         }
-
-        // 畫玩家
-        ctx.save();
-        ctx.translate(player.x, player.y);
-        ctx.rotate(player.angle);
-        ctx.fillStyle = isOverloaded ? '#fff' : '#00ffcc';
-        ctx.shadowBlur = isOverloaded ? 20 : 0; ctx.shadowColor = '#00ffcc';
-        ctx.beginPath();
-        ctx.moveTo(22, 0); ctx.lineTo(-15, -15); ctx.lineTo(-10, 0); ctx.lineTo(-15, 15);
-        ctx.fill();
+        if(isCharging) { 
+            ctx.beginPath(); ctx.arc(player.x, player.y, Math.min(chargeTime*1.5, 65), 0, Math.PI*2); 
+            ctx.strokeStyle = `rgba(0, 255, 204, 0.6)`; ctx.lineWidth = 3; ctx.stroke(); 
+        }
+        ctx.save(); ctx.translate(player.x, player.y); ctx.rotate(player.angle); 
+        ctx.fillStyle = isOverloaded?'#fff':'#00ffcc';
+        ctx.beginPath(); ctx.moveTo(22, 0); ctx.lineTo(-15, -15); ctx.lineTo(-10, 0); ctx.lineTo(-15, 15); ctx.fill(); 
         ctx.restore();
     }
     requestAnimationFrame(() => { update(); draw(); });
 }
-
 draw();
 </script>
 </body>
