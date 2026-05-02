@@ -129,29 +129,26 @@
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 let score=0, isGameOver=false, isPaused=false, gameStarted=false, energy=0, isOverloaded=false, overloadTimer=0, chargeTime=0, isCharging=false, boss=null, lastBossThresh=0, lastUpgradeThresh=0;
-let bullets=[], enemies=[], collectibles=[]; 
+let bullets=[], enemies=[], collectibles=[], bossBullets=[]; 
 const keys={};
 let damageFlash = 0; 
 
-// --- [ 難度與 Boss 系統變數 ] ---
 let gameTick = 0;
 let spawnTimer = 0;
 let defeatedBossCount = 0;
-let intensityMultiplier = 1.0; // 每殺一隻 Boss +10% 強度
+let intensityMultiplier = 1.0; 
 
-// --- [ 角色數值調整區 ] ---
 const heroes = {
     knight: { speed: 5, maxHp: 100, chargeSpeed: 1.0, color: '#00ffcc', defense: 1, damageMult: 1 },
     scout: { speed: 7.5, maxHp: 50, chargeSpeed: 1.8, color: '#ffff00', defense: 1.2, damageMult: 1 },
     fortress: { speed: 3.5, maxHp: 200, chargeSpeed: 0.6, color: '#0088ff', defense: 0.6, damageMult: 2 }
 };
 
-// --- [ 多樣化 Boss 庫 ] ---
 const bossDatabase = [
-    { name: "NEON TITAN", hp: 300, size: 80, speed: 1.2, color: "#ff0055" },
-    { name: "VECTOR STALKER", hp: 200, size: 50, speed: 2.5, color: "#00ff00" },
-    { name: "OMEGA CRUSHER", hp: 800, size: 120, speed: 0.6, color: "#ffaa00" },
-    { name: "CYBER HYDRA", hp: 500, size: 90, speed: 1.5, color: "#00aaff" }
+    { name: "NEON TITAN", hp: 400, size: 80, speed: 1.2, color: "#ff0055", type: "titan" },
+    { name: "VECTOR STALKER", hp: 300, size: 55, speed: 2.2, color: "#00ff00", type: "stalker" },
+    { name: "OMEGA CRUSHER", hp: 1200, size: 130, speed: 0.6, color: "#ffaa00", type: "crusher" },
+    { name: "CYBER HYDRA", hp: 700, size: 95, speed: 1.4, color: "#00aaff", type: "hydra" }
 ];
 
 let player = { x:0, y:0, size:20, angle:0, hp: 100, maxHp: 100, type: 'knight', multiShot: 1 };
@@ -175,7 +172,7 @@ function resetGame() {
     player.hp = d.maxHp; player.maxHp = d.maxHp; player.multiShot = 1; 
     score=0; energy=0; lastUpgradeThresh=0; lastBossThresh=0; gameTick=0;
     defeatedBossCount = 0; intensityMultiplier = 1.0;
-    bullets=[]; enemies=[]; collectibles=[]; boss=null; 
+    bullets=[]; enemies=[]; collectibles=[]; boss=null; bossBullets=[];
     isPaused = false; isGameOver = false;
     updateUI(); 
 }
@@ -186,8 +183,6 @@ function updateUI() {
     document.getElementById('hp-bar').style.width = hpPercent;
     setTimeout(() => { if(document.getElementById('hp-ghost')) document.getElementById('hp-ghost').style.width = hpPercent; }, 250);
     document.getElementById('overload-bar').style.width = energy + "%"; 
-    
-    // 顯示難度與 Boss 擊殺數
     const baseIntensity = Math.floor(100 + (gameTick / 600) * 5); 
     document.getElementById('intensity-val').innerText = Math.floor(baseIntensity * intensityMultiplier);
     document.getElementById('boss-count').innerText = defeatedBossCount;
@@ -223,20 +218,18 @@ function showUpgradeScreen() {
 }
 
 function spawnBoss() { 
-    // 從庫中隨機選一個 Boss
     const bData = bossDatabase[Math.floor(Math.random() * bossDatabase.length)];
-    // Boss 血量隨 分數 + 擊殺強度 成長
     const difficultyMult = (1 + (score / 20000)) * intensityMultiplier;
 
     boss = { 
-        x: canvas.width/2, 
-        y: 50, 
-        name: bData.name,
-        size: bData.size, 
-        hp: bData.hp * difficultyMult, 
-        maxHp: bData.hp * difficultyMult, 
-        speed: bData.speed * (intensityMultiplier * 0.9), // 速度略微隨強度提升
-        color: bData.color
+        x: canvas.width/2, y: -100, 
+        name: bData.name, size: bData.size, 
+        hp: bData.hp * difficultyMult, maxHp: bData.hp * difficultyMult, 
+        speed: bData.speed * (0.8 + intensityMultiplier * 0.2), 
+        color: bData.color,
+        type: bData.type,
+        attackTimer1: 0, attackTimer2: 0,
+        rotation: 0
     }; 
     document.getElementById('boss-name').innerText = `BOSS: ${boss.name}`;
     document.getElementById('boss-name').style.color = boss.color;
@@ -267,34 +260,109 @@ function fireBullet() {
     const dmg = heroes[player.type].damageMult || 1;
     for(let i=0; i<player.multiShot; i++) { 
         let offset = (i - (player.multiShot-1)/2) * 0.1; 
-        bullets.push({ 
-            x: player.x, y: player.y, 
-            vx: Math.cos(player.angle + offset)*14, vy: Math.sin(player.angle + offset)*14,
-            damage: dmg 
-        }); 
+        bullets.push({ x: player.x, y: player.y, vx: Math.cos(player.angle + offset)*14, vy: Math.sin(player.angle + offset)*14, damage: dmg }); 
     } 
 }
 function releaseNeonRing() { 
     const dmg = heroes[player.type].damageMult || 1;
-    for(let a=0; a<Math.PI*2; a+=0.4) {
-        bullets.push({x:player.x, y:player.y, vx:Math.cos(a)*8, vy:Math.sin(a)*8, type:'ring', damage: dmg}); 
-    }
+    for(let a=0; a<Math.PI*2; a+=0.4) { bullets.push({x:player.x, y:player.y, vx:Math.cos(a)*8, vy:Math.sin(a)*8, type:'ring', damage: dmg}); }
 }
 
 function handleEnemySpawning() {
     if(!gameStarted || isPaused || isGameOver || enemies.length > 80) return; 
-    
-    // 生成頻率隨 時間強度 + Boss疊加強度 加快
     const spawnRate = Math.max(10, (60 - Math.floor(gameTick / 600) * 2) / intensityMultiplier); 
     spawnTimer++;
-
     if(spawnTimer >= spawnRate) {
         const side = Math.floor(Math.random()*4); 
         let x = (side%2===0)? Math.random()*canvas.width : (side===1?-30:canvas.width+30), y = (side%2!==0)? Math.random()*canvas.height : (side===0?-30:canvas.height+30); 
-        
         const speedBoost = (Math.min(3, gameTick / 3600)) * intensityMultiplier;
         enemies.push({x, y, speed: (1.5 + Math.random()) + speedBoost}); 
         spawnTimer = 0;
+    }
+}
+
+function updateBossAI() {
+    if(!boss) return;
+    let d = Math.hypot(player.x - boss.x, player.y - boss.y);
+    if(d > 5) { boss.x += (player.x - boss.x)/d * boss.speed; boss.y += (player.y - boss.y)/d * boss.speed; }
+    
+    // --- New Boss Pattern Logic ---
+    boss.attackTimer1++;
+    
+    if (boss.type === "titan") {
+        // NEON TITAN: Spiral Attack (Interval increased to 220 ticks)
+        if(boss.attackTimer1 > 220) {
+            for(let a=0; a<Math.PI*2; a+=Math.PI/8) {
+                bossBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a + boss.rotation)*5, vy: Math.sin(a + boss.rotation)*5, radius: 6 });
+            }
+            boss.rotation += 0.5;
+            boss.attackTimer1 = 0;
+        }
+    } 
+    else if (boss.type === "stalker") {
+        // VECTOR STALKER: 3-way fan spread targeting player (Interval: 180 ticks)
+        if(boss.attackTimer1 > 180) {
+            let targetAngle = Math.atan2(player.y - boss.y, player.x - boss.x);
+            for(let i=-1; i<=1; i++) {
+                let angle = targetAngle + i * 0.3;
+                bossBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle)*6, vy: Math.sin(angle)*6, radius: 6 });
+            }
+            boss.attackTimer1 = 0;
+        }
+    }
+    else if (boss.type === "crusher") {
+        // OMEGA CRUSHER: 8-way slow large earthquake orbs (Interval: 280 ticks)
+        if(boss.attackTimer1 > 280) {
+            for(let a=0; a<Math.PI*2; a+=Math.PI/4) {
+                bossBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a)*2.5, vy: Math.sin(a)*2.5, radius: 15, isHeavy: true });
+            }
+            boss.attackTimer1 = 0;
+        }
+    }
+    else if (boss.type === "hydra") {
+        // CYBER HYDRA: Cross-shaped sniping (Interval: 160 ticks)
+        boss.attackTimer2++;
+        if(boss.attackTimer2 > 160) {
+            let directions = [0, Math.PI/2, Math.PI, Math.PI*1.5];
+            directions.forEach(angle => {
+                for(let i=0; i<3; i++) {
+                    setTimeout(() => {
+                        if(boss) bossBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle)*8, vy: Math.sin(angle)*8, radius: 7 });
+                    }, i * 120);
+                }
+            });
+            boss.attackTimer2 = 0;
+            boss.attackTimer1 = 0;
+        }
+    }
+
+    if(d < boss.size/2 + 15) { triggerDamageFeedback(1.2 * heroes[player.type].defense * intensityMultiplier); }
+    
+    // --- HP DEDUCTION FIX ---
+    for(let j=bullets.length-1; j>=0; j--) {
+        let bulletBossDist = Math.hypot(bullets[j].x - boss.x, bullets[j].y - boss.y);
+        if(bulletBossDist < boss.size/2 + 10) {
+            boss.hp -= (bullets[j].damage || 1); 
+            
+            // Visual feedback for boss hit
+            ctx.save();
+            ctx.strokeStyle = "white"; ctx.lineWidth = 4;
+            ctx.strokeRect(boss.x - boss.size/2, boss.y - boss.size/2, boss.size, boss.size);
+            ctx.restore();
+
+            if(bullets[j].type!=='ring') bullets.splice(j, 1);
+            
+            if(boss.hp <= 0) { 
+                score += 2500; defeatedBossCount++; intensityMultiplier += 0.1;
+                boss = null; document.getElementById('boss-ui').style.display = 'none'; 
+                for(let k=0; k<15; k++) collectibles.push({x: player.x+Math.random()*150-75, y: player.y+Math.random()*150-75});
+                updateUI(); break;
+            }
+        }
+    }
+    
+    if(boss) {
+        document.getElementById('boss-bar').style.width = (boss.hp / boss.maxHp * 100) + "%";
     }
 }
 
@@ -302,51 +370,37 @@ function update() {
     if(!gameStarted || isPaused || isGameOver) return; 
     const hero = heroes[player.type];
     gameTick++;
-    
     if(damageFlash > 0) damageFlash--; 
-
     if(keys['w']) player.y -= hero.speed; if(keys['s']) player.y += hero.speed; if(keys['a']) player.x -= hero.speed; if(keys['d']) player.x += hero.speed;
     player.x = Math.max(20, Math.min(canvas.width - 20, player.x));
     player.y = Math.max(20, Math.min(canvas.height - 20, player.y));
-
     if(isCharging) chargeTime += hero.chargeSpeed;
     if(isOverloaded) { if(gameTick % 5 === 0) fireBullet(); overloadTimer--; if(overloadTimer <= 0) isOverloaded = false; updateUI(); } 
-    
     handleEnemySpawning();
+    updateBossAI();
 
-    if(boss) {
-        let d = Math.hypot(player.x - boss.x, player.y - boss.y);
-        if(d > 5) { boss.x += (player.x - boss.x)/d * boss.speed; boss.y += (player.y - boss.y)/d * boss.speed; }
-        document.getElementById('boss-bar').style.width = (boss.hp / boss.maxHp * 100) + "%";
-        if(d < boss.size/2 + 15) { triggerDamageFeedback(1.2 * hero.defense * intensityMultiplier); }
-        for(let j=bullets.length-1; j>=0; j--) {
-            if(Math.hypot(bullets[j].x - boss.x, bullets[j].y - boss.y) < boss.size/2) {
-                boss.hp -= (bullets[j].damage || 1); 
-                if(bullets[j].type!=='ring') bullets.splice(j, 1);
-                if(boss.hp <= 0) { 
-                    score += 2500; // 擊殺 Boss 分數調整為 2500
-                    defeatedBossCount++;
-                    intensityMultiplier += 0.1; // 強度永久 +10%
-                    boss = null; 
-                    document.getElementById('boss-ui').style.display = 'none'; 
-                    for(let k=0; k<15; k++) collectibles.push({x: player.x+Math.random()*150-75, y: player.y+Math.random()*150-75});
-                    updateUI(); break;
-                }
-            }
+    for(let i=bossBullets.length-1; i>=0; i--) {
+        let b = bossBullets[i];
+        b.x += b.vx; b.y += b.vy;
+        let collisionRadius = b.radius || 6;
+        if(Math.hypot(player.x - b.x, player.y - b.y) < 20 + collisionRadius) {
+            triggerDamageFeedback(b.isHeavy ? 25 * hero.defense : 12 * hero.defense);
+            bossBullets.splice(i, 1);
+            continue;
         }
+        if(b.x<-100 || b.x>canvas.width+100 || b.y<-100 || b.y>canvas.height+100) bossBullets.splice(i, 1);
     }
 
     for(let i=enemies.length-1; i>=0; i--) {
-        let e = enemies[i], d = Math.hypot(player.x-e.x, player.y-e.y); 
-        if(d > 1) { e.x += (player.x-e.x)/d * e.speed; e.y += (player.y-e.y)/d * e.speed; }
-        if(d < 25) { triggerDamageFeedback(0.8 * hero.defense); }
+        let e = enemies[i], ed = Math.hypot(player.x-e.x, player.y-e.y); 
+        if(ed > 1) { e.x += (player.x-e.x)/ed * e.speed; e.y += (player.y-e.y)/ed * e.speed; }
+        if(ed < 25) { triggerDamageFeedback(0.8 * hero.defense); }
         for(let j=bullets.length-1; j>=0; j--) {
             if(Math.hypot(bullets[j].x-e.x, bullets[j].y-e.y) < 25) {
                 if(Math.random() > 0.7) collectibles.push({x: e.x, y: e.y});
                 enemies.splice(i, 1); if(bullets[j].type !== 'ring') bullets.splice(j, 1);
                 score += 100; updateUI();
                 if(score >= lastUpgradeThresh+2000){ lastUpgradeThresh+=2000; showUpgradeScreen(); }
-                // 每 5000 分觸發 Boss
                 if(score > 0 && score % 5000 === 0 && !boss && score > lastBossThresh) { lastBossThresh = score; spawnBoss(); } break;
             }
         }
@@ -356,11 +410,10 @@ function update() {
         if(Math.hypot(player.x - collectibles[i].x, player.y - collectibles[i].y) < 30) { 
             energy = Math.min(energy + 8, 100); 
             if(energy >= 100 && !isOverloaded){ isOverloaded=true; energy=0; overloadTimer=300; } 
-            collectibles.splice(i, 1); 
-            updateUI(); 
+            collectibles.splice(i, 1); updateUI(); 
         } 
     }
-    for(let i=bullets.length-1; i>=0; i--) { bullets[i].x += bullets[i].vx; bullets[i].y += bullets[i].vy; if(bullets[i].x<0||bullets[i].x>canvas.width||bullets[i].y<0||bullets[i].y>canvas.height) bullets.splice(i, 1); }
+    for(let i=bullets.length-1; i>=0; i--) { bullets[i].x += bullets[i].vx; bullets[i].y += bullets[i].vy; if(bullets[i].x<-50||bullets[i].x>canvas.width+50||bullets[i].y<-50||bullets[i].y>canvas.height+50) bullets.splice(i, 1); }
     if(player.hp <= 0) { isGameOver = true; document.getElementById('final-score-val').innerText = score; document.getElementById('game-over-screen').style.display = 'flex'; }
 }
 
@@ -372,14 +425,19 @@ function draw() {
         ctx.fillStyle = '#00ffcc'; collectibles.forEach(c => ctx.fillRect(c.x-4, c.y-4, 8, 8));
         bullets.forEach(b => { 
             ctx.fillStyle = b.type==='ring'?'#00ffcc':'#ffff00'; 
-            ctx.beginPath(); 
-            ctx.arc(b.x, b.y, (b.type==='ring'?6:4) * (b.damage > 1 ? 1.5 : 1), 0, Math.PI*2); 
-            ctx.fill(); 
+            ctx.beginPath(); ctx.arc(b.x, b.y, (b.type==='ring'?6:4) * (b.damage > 1 ? 1.5 : 1), 0, Math.PI*2); ctx.fill(); 
         });
+        
+        bossBullets.forEach(b => {
+            ctx.fillStyle = b.isHeavy ? '#ffcc00' : '#ff0000';
+            ctx.shadowBlur = b.isHeavy ? 20 : 10; ctx.shadowColor = ctx.fillStyle;
+            ctx.beginPath(); ctx.arc(b.x, b.y, b.radius || 6, 0, Math.PI*2); ctx.fill();
+            ctx.shadowBlur = 0;
+        });
+
         ctx.fillStyle = '#ff4444'; enemies.forEach(e => ctx.fillRect(e.x-10, e.y-10, 20, 20));
         if(boss) { 
-            ctx.fillStyle = boss.color; 
-            ctx.shadowBlur = 20; ctx.shadowColor = boss.color; 
+            ctx.fillStyle = boss.color; ctx.shadowBlur = 25; ctx.shadowColor = boss.color; 
             ctx.fillRect(boss.x-boss.size/2, boss.y-boss.size/2, boss.size, boss.size); 
             ctx.shadowBlur = 0; 
         }
@@ -395,8 +453,7 @@ function draw() {
             ctx.lineWidth = 3;
             ctx.strokeStyle = chargeTime > 30 / hero.chargeSpeed ? '#fff' : hero.color;
             ctx.shadowBlur = 15; ctx.shadowColor = hero.color;
-            ctx.stroke();
-            ctx.globalAlpha = 0.2; ctx.fillStyle = hero.color; ctx.fill();
+            ctx.stroke(); ctx.globalAlpha = 0.2; ctx.fillStyle = hero.color; ctx.fill();
             ctx.globalAlpha = 1.0; ctx.shadowBlur = 0;
         }
     }
