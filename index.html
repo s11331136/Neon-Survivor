@@ -69,15 +69,15 @@
         <div class="char-container">
             <div class="char-card" id="card-knight" onclick="selectChar('knight')">
                 <h3>⚔️ Knight</h3>
-                <p>Balanced</p>
+                <p>平衡型系統維護者。擁有穩定的輸出與防禦能力，各項指標均勻，是初次掃描系統的最佳選擇。</p>
             </div>
             <div class="char-card" id="card-scout" onclick="selectChar('scout')">
                 <h3>⚡ Scout</h3>
-                <p>Fast Charge & Half HP</p>
+                <p>高機動偵察單位。移動速度極快且能量充能迅速，但核心防禦薄弱，一旦被攔截將非常危險。</p>
             </div>
             <div class="char-card" id="card-fortress" onclick="selectChar('fortress')">
                 <h3>🛡️ Fortress</h3>
-                <p>Tanky & Double ATK</p>
+                <p>重裝移動要塞。配備厚重的數碼裝甲與雙倍功率的加農砲，雖然行動遲緩，但能粉碎一切障礙。</p>
             </div>
         </div>
         <button class="btn-start" id="confirm-btn" disabled onclick="startGame()" style="font-size: 20px;">CONFIRM & ENTER</button>
@@ -126,6 +126,10 @@
     <canvas id="gameCanvas"></canvas>
 
 <script>
+/**
+ * CORE CONSTANTS AND STATE
+ * --------------------------------------------------------------------------
+ */
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 let score=0, isGameOver=false, isPaused=false, gameStarted=false, energy=0, isOverloaded=false, overloadTimer=0, chargeTime=0, isCharging=false, boss=null, lastBossThresh=0, lastUpgradeThresh=0;
@@ -146,9 +150,9 @@ const heroes = {
 
 const bossDatabase = [
     { name: "NEON TITAN", hp: 400, size: 80, speed: 1.2, color: "#ff0055", type: "titan" },
-    { name: "VECTOR STALKER", hp: 300, size: 55, speed: 2.2, color: "#00ff00", type: "stalker" },
-    { name: "OMEGA CRUSHER", hp: 1200, size: 130, speed: 0.6, color: "#ffaa00", type: "crusher" },
-    { name: "CYBER HYDRA", hp: 700, size: 95, speed: 1.4, color: "#00aaff", type: "hydra" }
+    { name: "VECTOR STALKER", hp: 350, size: 55, speed: 2.2, color: "#00ff00", type: "stalker" },
+    { name: "OMEGA CRUSHER", hp: 1300, size: 130, speed: 0.6, color: "#ffaa00", type: "crusher" },
+    { name: "CYBER HYDRA", hp: 750, size: 95, speed: 1.4, color: "#00aaff", type: "hydra" }
 ];
 
 let player = { x:0, y:0, size:20, angle:0, hp: 100, maxHp: 100, type: 'knight', multiShot: 1 };
@@ -160,6 +164,10 @@ const upgradePool = [
     { title: "Repair", desc: "Heal 50% HP", effect: () => player.hp = Math.min(player.hp + player.maxHp*0.5, player.maxHp) }
 ];
 
+/**
+ * UI AND MENU FLOW
+ * --------------------------------------------------------------------------
+ */
 function toCharSelect() { document.getElementById('main-menu').style.display = 'none'; document.getElementById('char-select').style.display = 'flex'; }
 function selectChar(type) { player.type = type; document.querySelectorAll('.char-card').forEach(c => c.classList.remove('active')); document.getElementById('card-' + type).classList.add('active'); document.getElementById('confirm-btn').disabled = false; }
 function startGame() { document.getElementById('char-select').style.display = 'none'; document.getElementById('game-ui').style.display = 'block'; gameStarted = true; resize(); resetGame(); }
@@ -217,6 +225,10 @@ function showUpgradeScreen() {
     });
 }
 
+/**
+ * BOSS LOGIC AND SPAWNING
+ * --------------------------------------------------------------------------
+ */
 function spawnBoss() { 
     const bData = bossDatabase[Math.floor(Math.random() * bossDatabase.length)];
     const difficultyMult = (1 + (score / 20000)) * intensityMultiplier;
@@ -246,6 +258,10 @@ function drawGrid() {
     ctx.stroke();
 }
 
+/**
+ * PLAYER INPUTS
+ * --------------------------------------------------------------------------
+ */
 window.addEventListener('keydown', e => { 
     keys[e.key.toLowerCase()] = true; 
     if(e.key === 'Escape' || e.key.toLowerCase() === 'p') togglePause(); 
@@ -256,6 +272,10 @@ window.addEventListener('mousedown', e => { if(!gameStarted || isPaused) return;
 window.addEventListener('mouseup', e => { if(e.button===2 && isCharging) { if(chargeTime > 30 / heroes[player.type].chargeSpeed) releaseNeonRing(); isCharging=false; chargeTime=0; } });
 window.addEventListener('contextmenu', e => e.preventDefault());
 
+/**
+ * WEAPONS SYSTEM
+ * --------------------------------------------------------------------------
+ */
 function fireBullet() { 
     const dmg = heroes[player.type].damageMult || 1;
     for(let i=0; i<player.multiShot; i++) { 
@@ -281,17 +301,20 @@ function handleEnemySpawning() {
     }
 }
 
+/**
+ * BOSS AI ENGINE
+ * --------------------------------------------------------------------------
+ */
 function updateBossAI() {
     if(!boss) return;
     let d = Math.hypot(player.x - boss.x, player.y - boss.y);
     if(d > 5) { boss.x += (player.x - boss.x)/d * boss.speed; boss.y += (player.y - boss.y)/d * boss.speed; }
     
-    // --- New Boss Pattern Logic ---
     boss.attackTimer1++;
     
     if (boss.type === "titan") {
-        // NEON TITAN: Spiral Attack (Interval increased to 220 ticks)
-        if(boss.attackTimer1 > 220) {
+        // NEON TITAN: Spiral Attack (240 ticks)
+        if(boss.attackTimer1 > 240) {
             for(let a=0; a<Math.PI*2; a+=Math.PI/8) {
                 bossBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a + boss.rotation)*5, vy: Math.sin(a + boss.rotation)*5, radius: 6 });
             }
@@ -300,35 +323,35 @@ function updateBossAI() {
         }
     } 
     else if (boss.type === "stalker") {
-        // VECTOR STALKER: 3-way fan spread targeting player (Interval: 180 ticks)
-        if(boss.attackTimer1 > 180) {
+        // VECTOR STALKER: 3-way fan spread (200 ticks)
+        if(boss.attackTimer1 > 200) {
             let targetAngle = Math.atan2(player.y - boss.y, player.x - boss.x);
             for(let i=-1; i<=1; i++) {
-                let angle = targetAngle + i * 0.3;
-                bossBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle)*6, vy: Math.sin(angle)*6, radius: 6 });
+                let angle = targetAngle + i * 0.35;
+                bossBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle)*6.5, vy: Math.sin(angle)*6.5, radius: 6 });
             }
             boss.attackTimer1 = 0;
         }
     }
     else if (boss.type === "crusher") {
-        // OMEGA CRUSHER: 8-way slow large earthquake orbs (Interval: 280 ticks)
-        if(boss.attackTimer1 > 280) {
+        // OMEGA CRUSHER: 8-way Earthquake Orbs (320 ticks)
+        if(boss.attackTimer1 > 320) {
             for(let a=0; a<Math.PI*2; a+=Math.PI/4) {
-                bossBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a)*2.5, vy: Math.sin(a)*2.5, radius: 15, isHeavy: true });
+                bossBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a)*2.2, vy: Math.sin(a)*2.2, radius: 18, isHeavy: true });
             }
             boss.attackTimer1 = 0;
         }
     }
     else if (boss.type === "hydra") {
-        // CYBER HYDRA: Cross-shaped sniping (Interval: 160 ticks)
+        // CYBER HYDRA: Cross-shaped sniping (180 ticks)
         boss.attackTimer2++;
-        if(boss.attackTimer2 > 160) {
+        if(boss.attackTimer2 > 180) {
             let directions = [0, Math.PI/2, Math.PI, Math.PI*1.5];
             directions.forEach(angle => {
                 for(let i=0; i<3; i++) {
                     setTimeout(() => {
-                        if(boss) bossBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle)*8, vy: Math.sin(angle)*8, radius: 7 });
-                    }, i * 120);
+                        if(boss) bossBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(angle)*8.5, vy: Math.sin(angle)*8.5, radius: 7 });
+                    }, i * 140);
                 }
             });
             boss.attackTimer2 = 0;
@@ -338,16 +361,16 @@ function updateBossAI() {
 
     if(d < boss.size/2 + 15) { triggerDamageFeedback(1.2 * heroes[player.type].defense * intensityMultiplier); }
     
-    // --- HP DEDUCTION FIX ---
+    // HP DEDUCTION LOGIC
     for(let j=bullets.length-1; j>=0; j--) {
         let bulletBossDist = Math.hypot(bullets[j].x - boss.x, bullets[j].y - boss.y);
-        if(bulletBossDist < boss.size/2 + 10) {
+        if(bulletBossDist < boss.size/2 + 15) {
             boss.hp -= (bullets[j].damage || 1); 
             
-            // Visual feedback for boss hit
+            // Visual Flash on Hit
             ctx.save();
-            ctx.strokeStyle = "white"; ctx.lineWidth = 4;
-            ctx.strokeRect(boss.x - boss.size/2, boss.y - boss.size/2, boss.size, boss.size);
+            ctx.strokeStyle = "white"; ctx.lineWidth = 5;
+            ctx.strokeRect(boss.x - boss.size/2 - 2, boss.y - boss.size/2 - 2, boss.size + 4, boss.size + 4);
             ctx.restore();
 
             if(bullets[j].type!=='ring') bullets.splice(j, 1);
@@ -366,57 +389,86 @@ function updateBossAI() {
     }
 }
 
+/**
+ * MAIN UPDATE LOOP
+ * --------------------------------------------------------------------------
+ */
 function update() {
     if(!gameStarted || isPaused || isGameOver) return; 
     const hero = heroes[player.type];
     gameTick++;
     if(damageFlash > 0) damageFlash--; 
+    
+    // Player Movement
     if(keys['w']) player.y -= hero.speed; if(keys['s']) player.y += hero.speed; if(keys['a']) player.x -= hero.speed; if(keys['d']) player.x += hero.speed;
     player.x = Math.max(20, Math.min(canvas.width - 20, player.x));
     player.y = Math.max(20, Math.min(canvas.height - 20, player.y));
+    
+    // Skill Handling
     if(isCharging) chargeTime += hero.chargeSpeed;
     if(isOverloaded) { if(gameTick % 5 === 0) fireBullet(); overloadTimer--; if(overloadTimer <= 0) isOverloaded = false; updateUI(); } 
+    
     handleEnemySpawning();
     updateBossAI();
 
+    // Projectile Updates
     for(let i=bossBullets.length-1; i>=0; i--) {
         let b = bossBullets[i];
         b.x += b.vx; b.y += b.vy;
         let collisionRadius = b.radius || 6;
         if(Math.hypot(player.x - b.x, player.y - b.y) < 20 + collisionRadius) {
-            triggerDamageFeedback(b.isHeavy ? 25 * hero.defense : 12 * hero.defense);
+            triggerDamageFeedback(b.isHeavy ? 28 * hero.defense : 13 * hero.defense);
             bossBullets.splice(i, 1);
             continue;
         }
-        if(b.x<-100 || b.x>canvas.width+100 || b.y<-100 || b.y>canvas.height+100) bossBullets.splice(i, 1);
+        if(b.x<-150 || b.x>canvas.width+150 || b.y<-150 || b.y>canvas.height+150) bossBullets.splice(i, 1);
     }
 
+    // Enemy and Collision Loop
     for(let i=enemies.length-1; i>=0; i--) {
         let e = enemies[i], ed = Math.hypot(player.x-e.x, player.y-e.y); 
         if(ed > 1) { e.x += (player.x-e.x)/ed * e.speed; e.y += (player.y-e.y)/ed * e.speed; }
         if(ed < 25) { triggerDamageFeedback(0.8 * hero.defense); }
         for(let j=bullets.length-1; j>=0; j--) {
             if(Math.hypot(bullets[j].x-e.x, bullets[j].y-e.y) < 25) {
-                if(Math.random() > 0.7) collectibles.push({x: e.x, y: e.y});
+                if(Math.random() > 0.75) collectibles.push({x: e.x, y: e.y});
                 enemies.splice(i, 1); if(bullets[j].type !== 'ring') bullets.splice(j, 1);
                 score += 100; updateUI();
-                if(score >= lastUpgradeThresh+2000){ lastUpgradeThresh+=2000; showUpgradeScreen(); }
-                if(score > 0 && score % 5000 === 0 && !boss && score > lastBossThresh) { lastBossThresh = score; spawnBoss(); } break;
+                if(score >= lastUpgradeThresh + 2000){ lastUpgradeThresh += 2000; showUpgradeScreen(); }
+                
+                // --- BOSS SPAWN LOGIC (MODIFIED TO 7500) ---
+                if(score > 0 && score % 7500 === 0 && !boss && score > lastBossThresh) { 
+                    lastBossThresh = score; 
+                    spawnBoss(); 
+                } break;
             }
         }
     }
 
+    // Energy Drops
     for(let i=collectibles.length-1; i>=0; i--) { 
-        if(Math.hypot(player.x - collectibles[i].x, player.y - collectibles[i].y) < 30) { 
+        if(Math.hypot(player.x - collectibles[i].x, player.y - collectibles[i].y) < 40) { 
             energy = Math.min(energy + 8, 100); 
             if(energy >= 100 && !isOverloaded){ isOverloaded=true; energy=0; overloadTimer=300; } 
             collectibles.splice(i, 1); updateUI(); 
         } 
     }
-    for(let i=bullets.length-1; i>=0; i--) { bullets[i].x += bullets[i].vx; bullets[i].y += bullets[i].vy; if(bullets[i].x<-50||bullets[i].x>canvas.width+50||bullets[i].y<-50||bullets[i].y>canvas.height+50) bullets.splice(i, 1); }
+    
+    // Player Bullets
+    for(let i=bullets.length-1; i>=0; i--) { 
+        bullets[i].x += bullets[i].vx; 
+        bullets[i].y += bullets[i].vy; 
+        if(bullets[i].x<-100||bullets[i].x>canvas.width+100||bullets[i].y<-100||bullets[i].y>canvas.height+100) bullets.splice(i, 1); 
+    }
+    
+    // Death Check
     if(player.hp <= 0) { isGameOver = true; document.getElementById('final-score-val').innerText = score; document.getElementById('game-over-screen').style.display = 'flex'; }
 }
 
+/**
+ * RENDERING ENGINE
+ * --------------------------------------------------------------------------
+ */
 function draw() {
     ctx.fillStyle = '#050505'; ctx.fillRect(0,0,canvas.width,canvas.height);
     if(gameStarted) {
