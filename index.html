@@ -26,6 +26,10 @@
         .char-card h3 { margin: 10px 0; color: #00ffcc; }
         .char-card p { font-size: 14px; color: #bbb; line-height: 1.4; }
         
+        /* 隱藏角色樣式 */
+        .locked { filter: grayscale(1) brightness(0.5); cursor: not-allowed; border: 2px dashed #444 !important; }
+        .locked:hover { transform: none !important; box-shadow: none !important; }
+
         #upgrade-screen, #pause-menu { background: rgba(0, 0, 0, 0.9); display: none; }
         .card-container { display: flex; gap: 15px; }
         .upgrade-card { background: linear-gradient(145deg, #1a1a1a, #0a0a0a); border: 2px solid #ffcc00; padding: 25px; width: 220px; border-radius: 15px; cursor: pointer; transition: 0.2s; }
@@ -83,6 +87,10 @@
                 <h3>🛡️ Fortress</h3>
                 <p>Tanky & Double ATK</p>
             </div>
+            <div class="char-card locked" id="card-void" onclick="selectChar('void')">
+                <h3 id="void-title">🔒 ???</h3>
+                <p id="void-desc">Total Bosses Defeated: 0/10</p>
+            </div>
         </div>
         <button class="btn-start" id="confirm-btn" disabled onclick="startGame()" style="font-size: 20px;">CONFIRM & ENTER</button>
     </div>
@@ -107,6 +115,7 @@
 
     <div id="game-ui">
         Score: <span id="score">0</span><br>
+        High Score: <span id="high-score">0</span><br>
         HP 
         <div class="bar-container" id="hp-container">
             <div id="hp-ghost"></div>
@@ -146,10 +155,17 @@ let spawnTimer = 0;
 let defeatedBossCount = 0;
 let intensityMultiplier = 1.0; 
 
+// New State for Improvements
+let highScore = localStorage.getItem('neon_high_score') || 0;
+let totalBossesDefeated = parseInt(localStorage.getItem('neon_total_bosses')) || 0;
+let shakeAmount = 0;
+document.getElementById('high-score').innerText = highScore;
+
 const heroes = {
     knight: { speed: 5, maxHp: 100, chargeSpeed: 1.0, color: '#00ffcc', defense: 1, damageMult: 1 },
     scout: { speed: 7.5, maxHp: 50, chargeSpeed: 1.8, color: '#ffff00', defense: 1.2, damageMult: 1 },
-    fortress: { speed: 3.5, maxHp: 200, chargeSpeed: 0.6, color: '#0088ff', defense: 0.6, damageMult: 2 }
+    fortress: { speed: 3.5, maxHp: 200, chargeSpeed: 0.6, color: '#0088ff', defense: 0.6, damageMult: 2 },
+    void: { speed: 6.0, maxHp: 80, chargeSpeed: 1.4, color: '#ff00ff', defense: 0.8, damageMult: 1.5, isHidden: true }
 };
 
 const bossDatabase = [
@@ -172,8 +188,29 @@ const upgradePool = [
  * UI AND MENU FLOW
  * --------------------------------------------------------------------------
  */
-function toCharSelect() { document.getElementById('main-menu').style.display = 'none'; document.getElementById('char-select').style.display = 'flex'; }
-function selectChar(type) { player.type = type; document.querySelectorAll('.char-card').forEach(c => c.classList.remove('active')); document.getElementById('card-' + type).classList.add('active'); document.getElementById('confirm-btn').disabled = false; }
+function toCharSelect() { 
+    document.getElementById('main-menu').style.display = 'none'; 
+    document.getElementById('char-select').style.display = 'flex'; 
+    
+    // 檢查解鎖狀態
+    const voidCard = document.getElementById('card-void');
+    if (totalBossesDefeated >= 10) {
+        voidCard.classList.remove('locked');
+        document.getElementById('void-title').innerText = "🔮 Void Walker";
+        document.getElementById('void-desc').innerText = "Fast & High Damage";
+    } else {
+        document.getElementById('void-desc').innerText = `Total Bosses Defeated: ${totalBossesDefeated}/10`;
+    }
+}
+
+function selectChar(type) { 
+    if (type === 'void' && totalBossesDefeated < 10) return; // 鎖定狀態不能選
+    player.type = type; 
+    document.querySelectorAll('.char-card').forEach(c => c.classList.remove('active')); 
+    document.getElementById('card-' + type).classList.add('active'); 
+    document.getElementById('confirm-btn').disabled = false; 
+}
+
 function startGame() { document.getElementById('char-select').style.display = 'none'; document.getElementById('game-ui').style.display = 'block'; gameStarted = true; resize(); resetGame(); }
 function backToMain() { location.reload(); }
 
@@ -198,11 +235,13 @@ function updateUI() {
     const baseIntensity = Math.floor(100 + (gameTick / 600) * 5); 
     document.getElementById('intensity-val').innerText = Math.floor(baseIntensity * intensityMultiplier);
     document.getElementById('boss-count').innerText = defeatedBossCount;
+    document.getElementById('high-score').innerText = highScore;
 }
 
 function triggerDamageFeedback(amt) {
     player.hp -= amt;
     damageFlash = 10;
+    shakeAmount = 10; // Trigger Screen Shake
     const hpContainer = document.getElementById('hp-container');
     hpContainer.classList.add('shaking');
     setTimeout(() => hpContainer.classList.remove('shaking'), 200);
@@ -236,6 +275,7 @@ function showUpgradeScreen() {
 function spawnBoss() { 
     const bData = bossDatabase[Math.floor(Math.random() * bossDatabase.length)];
     const difficultyMult = (1 + (score / 20000)) * intensityMultiplier;
+    shakeAmount = 20; // Big shake when boss appears
 
     boss = { 
         x: canvas.width/2, y: -100, 
@@ -381,6 +421,12 @@ function updateBossAI() {
             
             if(boss.hp <= 0) { 
                 score += 2500; defeatedBossCount++; intensityMultiplier += 0.1;
+                
+                // 增加累計擊敗數並儲存
+                totalBossesDefeated++;
+                localStorage.setItem('neon_total_bosses', totalBossesDefeated);
+                
+                shakeAmount = 15; // Shake when boss dies
                 boss = null; document.getElementById('boss-ui').style.display = 'none'; 
                 for(let k=0; k<15; k++) collectibles.push({x: player.x+Math.random()*150-75, y: player.y+Math.random()*150-75});
                 updateUI(); break;
@@ -466,7 +512,15 @@ function update() {
     }
     
     // Death Check
-    if(player.hp <= 0) { isGameOver = true; document.getElementById('final-score-val').innerText = score; document.getElementById('game-over-screen').style.display = 'flex'; }
+    if(player.hp <= 0) { 
+        isGameOver = true; 
+        if(score > highScore) {
+            highScore = score;
+            localStorage.setItem('neon_high_score', highScore);
+        }
+        document.getElementById('final-score-val').innerText = score; 
+        document.getElementById('game-over-screen').style.display = 'flex'; 
+    }
 }
 
 /**
@@ -474,6 +528,13 @@ function update() {
  * --------------------------------------------------------------------------
  */
 function draw() {
+    ctx.save(); // Save for Screen Shake
+    if (shakeAmount > 0) {
+        ctx.translate((Math.random() - 0.5) * shakeAmount, (Math.random() - 0.5) * shakeAmount);
+        shakeAmount *= 0.9;
+        if (shakeAmount < 0.5) shakeAmount = 0;
+    }
+
     ctx.fillStyle = '#050505'; ctx.fillRect(0,0,canvas.width,canvas.height);
     if(gameStarted) {
         drawGrid();
@@ -513,6 +574,7 @@ function draw() {
             ctx.globalAlpha = 1.0; ctx.shadowBlur = 0;
         }
     }
+    ctx.restore(); // Restore from Screen Shake
     requestAnimationFrame(draw);
 }
 
