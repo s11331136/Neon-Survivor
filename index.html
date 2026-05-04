@@ -26,10 +26,6 @@
         .char-card h3 { margin: 10px 0; color: #00ffcc; }
         .char-card p { font-size: 14px; color: #bbb; line-height: 1.4; }
         
-        /* 隱藏角色樣式 */
-        .locked { filter: grayscale(1) brightness(0.5); cursor: not-allowed; border: 2px dashed #444 !important; }
-        .locked:hover { transform: none !important; box-shadow: none !important; }
-
         #upgrade-screen, #pause-menu { background: rgba(0, 0, 0, 0.9); display: none; }
         .card-container { display: flex; gap: 15px; }
         .upgrade-card { background: linear-gradient(145deg, #1a1a1a, #0a0a0a); border: 2px solid #ffcc00; padding: 25px; width: 220px; border-radius: 15px; cursor: pointer; transition: 0.2s; }
@@ -62,25 +58,14 @@
         #boss-ui { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); display: none; width: 50%; pointer-events: none; }
         #boss-bar-box { width: 100%; height: 15px; background: rgba(0,0,0,0.5); border: 1px solid #ff0055; }
         #boss-bar { width: 100%; height: 100%; background: #ff0055; transition: width 0.1s; }
-        #login-section input:focus { outline: none; border-color: #00ffcc; box-shadow: 0 0 10px #00ffcc; }
     </style>
 </head>
 <body>
+
     <div id="main-menu" class="overlay">
         <h1>NEON SURVIVOR</h1>
-        
-        <div id="login-section" style="background: rgba(0, 255, 204, 0.1); padding: 25px; border-radius: 15px; border: 1px solid #00ffcc; margin-bottom: 20px; width: 300px;">
-            <input type="text" id="username" placeholder="USERNAME" style="width: 80%; padding: 10px; margin-bottom: 10px; background: #000; border: 1px solid #444; color: #fff; text-align: center;">
-            <input type="password" id="password" placeholder="PASSWORD" style="width: 80%; padding: 10px; margin-bottom: 15px; background: #000; border: 1px solid #444; color: #fff; text-align: center;">
-            <div style="display: flex; gap: 10px; justify-content: center;">
-                <button class="btn-start" onclick="handleAuth('login')" style="font-size: 14px; padding: 10px 20px;">LOGIN</button>
-                <button class="btn-start" onclick="handleAuth('register')" style="font-size: 14px; padding: 10px 20px; border-color: #ffcc00; color: #ffcc00;">SIGN UP</button>
-            </div>
-            <p id="auth-msg" style="color: #ff4444; font-size: 14px; margin-top: 10px; height: 1.2em;"></p>
-        </div>
-
         <p class="controls-hint">WASD: Move | Left Click: Shoot | Right Click: Neon Ring (Hold)</p>
-        <button class="btn-start" id="enter-btn" onclick="toCharSelect()" style="display: none;">ENTER SYSTEM</button>
+        <button class="btn-start" onclick="toCharSelect()">ENTER<br>SYSTEM</button>
     </div>
 
     <div id="char-select" class="overlay">
@@ -97,10 +82,6 @@
             <div class="char-card" id="card-fortress" onclick="selectChar('fortress')">
                 <h3>🛡️ Fortress</h3>
                 <p>Tanky & Double ATK</p>
-            </div>
-            <div class="char-card locked" id="card-void" onclick="selectChar('void')">
-                <h3 id="void-title">🔒 ???</h3>
-                <p id="void-desc">Total Bosses Defeated: 0/10</p>
             </div>
         </div>
         <button class="btn-start" id="confirm-btn" disabled onclick="startGame()" style="font-size: 20px;">CONFIRM & ENTER</button>
@@ -151,64 +132,8 @@
 
 <script>
 /**
- * ACCOUNT SYSTEM ADD-ON
- */
-let currentUser = null;
-
-function handleAuth(type) {
-    const userInp = document.getElementById('username').value.trim();
-    const passInp = document.getElementById('password').value.trim();
-    const msg = document.getElementById('auth-msg');
-
-    if (!userInp || !passInp) {
-        msg.style.color = "#ff4444";
-        msg.innerText = "Please fill all fields.";
-        return;
-    }
-
-    let accounts = JSON.parse(localStorage.getItem('neon_accounts')) || {};
-
-    if (type === 'register') {
-        if (accounts[userInp]) {
-            msg.style.color = "#ff4444";
-            msg.innerText = "User already exists!";
-        } else {
-            accounts[userInp] = { password: passInp, highScore: 0, totalBosses: 0 };
-            localStorage.setItem('neon_accounts', JSON.stringify(accounts));
-            msg.style.color = "#00ffcc";
-            msg.innerText = "Success! Now Login.";
-        }
-    } else if (type === 'login') {
-        if (accounts[userInp] && accounts[userInp].password === passInp) {
-            currentUser = userInp;
-            // 同步資料
-            highScore = accounts[userInp].highScore || 0;
-            totalBossesDefeated = accounts[userInp].totalBosses || 0;
-            
-            document.getElementById('high-score').innerText = highScore;
-            document.getElementById('login-section').style.display = 'none';
-            document.getElementById('enter-btn').style.display = 'block';
-            msg.style.color = "#00ffcc";
-            msg.innerText = "Logged in as " + userInp;
-        } else {
-            msg.style.color = "#ff4444";
-            msg.innerText = "Wrong name or password.";
-        }
-    }
-}
-
-function syncAccountData() {
-    if (!currentUser) return;
-    let accounts = JSON.parse(localStorage.getItem('neon_accounts')) || {};
-    if (accounts[currentUser]) {
-        accounts[currentUser].highScore = Math.max(accounts[currentUser].highScore, highScore);
-        accounts[currentUser].totalBosses = totalBossesDefeated;
-        localStorage.setItem('neon_accounts', JSON.stringify(accounts));
-    }
-}
-
-/**
  * CORE CONSTANTS AND STATE
+ * --------------------------------------------------------------------------
  */
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -222,15 +147,15 @@ let spawnTimer = 0;
 let defeatedBossCount = 0;
 let intensityMultiplier = 1.0; 
 
-let highScore = 0;
-let totalBossesDefeated = 0;
+// New State for Improvements
+let highScore = localStorage.getItem('neon_high_score') || 0;
 let shakeAmount = 0;
+document.getElementById('high-score').innerText = highScore;
 
 const heroes = {
     knight: { speed: 5, maxHp: 100, chargeSpeed: 1.0, color: '#00ffcc', defense: 1, damageMult: 1 },
     scout: { speed: 7.5, maxHp: 50, chargeSpeed: 1.8, color: '#ffff00', defense: 1.2, damageMult: 1 },
-    fortress: { speed: 3.5, maxHp: 200, chargeSpeed: 0.6, color: '#0088ff', defense: 0.6, damageMult: 2 },
-    void: { speed: 6.0, maxHp: 80, chargeSpeed: 1.4, color: '#ff00ff', defense: 0.8, damageMult: 1.5, isHidden: true }
+    fortress: { speed: 3.5, maxHp: 200, chargeSpeed: 0.6, color: '#0088ff', defense: 0.6, damageMult: 2 }
 };
 
 const bossDatabase = [
@@ -251,37 +176,11 @@ const upgradePool = [
 
 /**
  * UI AND MENU FLOW
+ * --------------------------------------------------------------------------
  */
-function toCharSelect() { 
-    document.getElementById('main-menu').style.display = 'none'; 
-    document.getElementById('char-select').style.display = 'flex'; 
-    
-    const voidCard = document.getElementById('card-void');
-    if (totalBossesDefeated >= 10) {
-        voidCard.classList.remove('locked');
-        document.getElementById('void-title').innerText = "🔮 Void Walker";
-        document.getElementById('void-desc').innerText = "Fast & High Damage";
-    } else {
-        document.getElementById('void-desc').innerText = `Total Bosses Defeated: ${totalBossesDefeated}/10`;
-    }
-}
-
-function selectChar(type) { 
-    if (type === 'void' && totalBossesDefeated < 10) return; 
-    player.type = type; 
-    document.querySelectorAll('.char-card').forEach(c => c.classList.remove('active')); 
-    document.getElementById('card-' + type).classList.add('active'); 
-    document.getElementById('confirm-btn').disabled = false; 
-}
-
-function startGame() { 
-    document.getElementById('char-select').style.display = 'none'; 
-    document.getElementById('game-ui').style.display = 'block'; 
-    gameStarted = true; 
-    resize(); 
-    resetGame(); 
-}
-
+function toCharSelect() { document.getElementById('main-menu').style.display = 'none'; document.getElementById('char-select').style.display = 'flex'; }
+function selectChar(type) { player.type = type; document.querySelectorAll('.char-card').forEach(c => c.classList.remove('active')); document.getElementById('card-' + type).classList.add('active'); document.getElementById('confirm-btn').disabled = false; }
+function startGame() { document.getElementById('char-select').style.display = 'none'; document.getElementById('game-ui').style.display = 'block'; gameStarted = true; resize(); resetGame(); }
 function backToMain() { location.reload(); }
 
 function resetGame() { 
@@ -311,7 +210,7 @@ function updateUI() {
 function triggerDamageFeedback(amt) {
     player.hp -= amt;
     damageFlash = 10;
-    shakeAmount = 10;
+    shakeAmount = 10; // Trigger Screen Shake
     const hpContainer = document.getElementById('hp-container');
     hpContainer.classList.add('shaking');
     setTimeout(() => hpContainer.classList.remove('shaking'), 200);
@@ -340,11 +239,12 @@ function showUpgradeScreen() {
 
 /**
  * BOSS LOGIC AND SPAWNING
+ * --------------------------------------------------------------------------
  */
 function spawnBoss() { 
     const bData = bossDatabase[Math.floor(Math.random() * bossDatabase.length)];
     const difficultyMult = (1 + (score / 20000)) * intensityMultiplier;
-    shakeAmount = 20;
+    shakeAmount = 20; // Big shake when boss appears
 
     boss = { 
         x: canvas.width/2, y: -100, 
@@ -373,6 +273,7 @@ function drawGrid() {
 
 /**
  * PLAYER INPUTS
+ * --------------------------------------------------------------------------
  */
 window.addEventListener('keydown', e => { 
     keys[e.key.toLowerCase()] = true; 
@@ -386,6 +287,7 @@ window.addEventListener('contextmenu', e => e.preventDefault());
 
 /**
  * WEAPONS SYSTEM
+ * --------------------------------------------------------------------------
  */
 function fireBullet() { 
     const dmg = heroes[player.type].damageMult || 1;
@@ -414,6 +316,7 @@ function handleEnemySpawning() {
 
 /**
  * BOSS AI ENGINE
+ * --------------------------------------------------------------------------
  */
 function updateBossAI() {
     if(!boss) return;
@@ -423,6 +326,7 @@ function updateBossAI() {
     boss.attackTimer1++;
     
     if (boss.type === "titan") {
+        // NEON TITAN: Spiral Attack (240 ticks)
         if(boss.attackTimer1 > 240) {
             for(let a=0; a<Math.PI*2; a+=Math.PI/8) {
                 bossBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a + boss.rotation)*5, vy: Math.sin(a + boss.rotation)*5, radius: 6 });
@@ -432,6 +336,7 @@ function updateBossAI() {
         }
     } 
     else if (boss.type === "stalker") {
+        // VECTOR STALKER: 3-way fan spread (200 ticks)
         if(boss.attackTimer1 > 200) {
             let targetAngle = Math.atan2(player.y - boss.y, player.x - boss.x);
             for(let i=-1; i<=1; i++) {
@@ -442,6 +347,7 @@ function updateBossAI() {
         }
     }
     else if (boss.type === "crusher") {
+        // OMEGA CRUSHER: 8-way Earthquake Orbs (320 ticks)
         if(boss.attackTimer1 > 320) {
             for(let a=0; a<Math.PI*2; a+=Math.PI/4) {
                 bossBullets.push({ x: boss.x, y: boss.y, vx: Math.cos(a)*2.2, vy: Math.sin(a)*2.2, radius: 18, isHeavy: true });
@@ -450,6 +356,7 @@ function updateBossAI() {
         }
     }
     else if (boss.type === "hydra") {
+        // CYBER HYDRA: Cross-shaped sniping (180 ticks)
         boss.attackTimer2++;
         if(boss.attackTimer2 > 180) {
             let directions = [0, Math.PI/2, Math.PI, Math.PI*1.5];
@@ -467,18 +374,23 @@ function updateBossAI() {
 
     if(d < boss.size/2 + 15) { triggerDamageFeedback(1.2 * heroes[player.type].defense * intensityMultiplier); }
     
+    // HP DEDUCTION LOGIC
     for(let j=bullets.length-1; j>=0; j--) {
         let bulletBossDist = Math.hypot(bullets[j].x - boss.x, bullets[j].y - boss.y);
         if(bulletBossDist < boss.size/2 + 15) {
             boss.hp -= (bullets[j].damage || 1); 
             
+            // Visual Flash on Hit
+            ctx.save();
+            ctx.strokeStyle = "white"; ctx.lineWidth = 5;
+            ctx.strokeRect(boss.x - boss.size/2 - 2, boss.y - boss.size/2 - 2, boss.size + 4, boss.size + 4);
+            ctx.restore();
+
             if(bullets[j].type!=='ring') bullets.splice(j, 1);
             
             if(boss.hp <= 0) { 
                 score += 2500; defeatedBossCount++; intensityMultiplier += 0.1;
-                totalBossesDefeated++;
-                syncAccountData();
-                shakeAmount = 15; 
+                shakeAmount = 15; // Shake when boss dies
                 boss = null; document.getElementById('boss-ui').style.display = 'none'; 
                 for(let k=0; k<15; k++) collectibles.push({x: player.x+Math.random()*150-75, y: player.y+Math.random()*150-75});
                 updateUI(); break;
@@ -493,6 +405,7 @@ function updateBossAI() {
 
 /**
  * MAIN UPDATE LOOP
+ * --------------------------------------------------------------------------
  */
 function update() {
     if(!gameStarted || isPaused || isGameOver) return; 
@@ -500,16 +413,19 @@ function update() {
     gameTick++;
     if(damageFlash > 0) damageFlash--; 
     
+    // Player Movement
     if(keys['w']) player.y -= hero.speed; if(keys['s']) player.y += hero.speed; if(keys['a']) player.x -= hero.speed; if(keys['d']) player.x += hero.speed;
     player.x = Math.max(20, Math.min(canvas.width - 20, player.x));
     player.y = Math.max(20, Math.min(canvas.height - 20, player.y));
     
+    // Skill Handling
     if(isCharging) chargeTime += hero.chargeSpeed;
     if(isOverloaded) { if(gameTick % 5 === 0) fireBullet(); overloadTimer--; if(overloadTimer <= 0) isOverloaded = false; updateUI(); } 
     
     handleEnemySpawning();
     updateBossAI();
 
+    // Projectile Updates
     for(let i=bossBullets.length-1; i>=0; i--) {
         let b = bossBullets[i];
         b.x += b.vx; b.y += b.vy;
@@ -522,6 +438,7 @@ function update() {
         if(b.x<-150 || b.x>canvas.width+150 || b.y<-150 || b.y>canvas.height+150) bossBullets.splice(i, 1);
     }
 
+    // Enemy and Collision Loop
     for(let i=enemies.length-1; i>=0; i--) {
         let e = enemies[i], ed = Math.hypot(player.x-e.x, player.y-e.y); 
         if(ed > 1) { e.x += (player.x-e.x)/ed * e.speed; e.y += (player.y-e.y)/ed * e.speed; }
@@ -533,6 +450,7 @@ function update() {
                 score += 100; updateUI();
                 if(score >= lastUpgradeThresh + 2000){ lastUpgradeThresh += 2000; showUpgradeScreen(); }
                 
+                // --- BOSS SPAWN LOGIC (MODIFIED TO 7500) ---
                 if(score > 0 && score % 7500 === 0 && !boss && score > lastBossThresh) { 
                     lastBossThresh = score; 
                     spawnBoss(); 
@@ -541,6 +459,7 @@ function update() {
         }
     }
 
+    // Energy Drops
     for(let i=collectibles.length-1; i>=0; i--) { 
         if(Math.hypot(player.x - collectibles[i].x, player.y - collectibles[i].y) < 40) { 
             energy = Math.min(energy + 8, 100); 
@@ -549,17 +468,19 @@ function update() {
         } 
     }
     
+    // Player Bullets
     for(let i=bullets.length-1; i>=0; i--) { 
         bullets[i].x += bullets[i].vx; 
         bullets[i].y += bullets[i].vy; 
         if(bullets[i].x<-100||bullets[i].x>canvas.width+100||bullets[i].y<-100||bullets[i].y>canvas.height+100) bullets.splice(i, 1); 
     }
     
+    // Death Check
     if(player.hp <= 0) { 
         isGameOver = true; 
         if(score > highScore) {
             highScore = score;
-            syncAccountData();
+            localStorage.setItem('neon_high_score', highScore);
         }
         document.getElementById('final-score-val').innerText = score; 
         document.getElementById('game-over-screen').style.display = 'flex'; 
@@ -568,9 +489,10 @@ function update() {
 
 /**
  * RENDERING ENGINE
+ * --------------------------------------------------------------------------
  */
 function draw() {
-    ctx.save(); 
+    ctx.save(); // Save for Screen Shake
     if (shakeAmount > 0) {
         ctx.translate((Math.random() - 0.5) * shakeAmount, (Math.random() - 0.5) * shakeAmount);
         shakeAmount *= 0.9;
@@ -616,7 +538,7 @@ function draw() {
             ctx.globalAlpha = 1.0; ctx.shadowBlur = 0;
         }
     }
-    ctx.restore(); 
+    ctx.restore(); // Restore from Screen Shake
     requestAnimationFrame(draw);
 }
 
